@@ -1,0 +1,16 @@
+{
+  "name": "LGSVLRaptorSensor",
+  "accessType": "private",
+  "description": "Provides mock interface for Raptor driver on IAC Dallara IL15 in 2021 competition at IMS. Created by Gaia Platform LLC in collaboration with the University of Hawai'i and University of San Diego AI Racing Tech Team.",
+  "licenseName": "MIT License",
+  "copyright": "Gaia Platform LLC",
+  "tags": [
+    {
+      "name": "Control"
+    },
+    {
+      "name": "Analytics"
+    }
+  ],
+  "id": "8266874e-c858-4bf3-a57b-7dd9e3c9c80d"
+}
