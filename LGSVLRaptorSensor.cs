@@ -74,7 +74,9 @@ namespace Simulator.Sensors
     {
         public void Register(IBridgePlugin plugin)
         {
-            if (plugin?.GetBridgeNameAttribute()?.Name == "ROS" || plugin?.GetBridgeNameAttribute()?.Type == "ROS2")
+            if (plugin?.GetBridgeNameAttribute()?.Name == "ROS" || plugin?.GetBridgeNameAttribute()?.Type == "ROS2" ||
+            plugin?.GetBridgeNameAttribute()?.Type == "ROS2_Bridge_GAIA"
+            )
             {
                 plugin.Factory.RegSubscriber(plugin,
                     (VehicleCommand data) => new VehicleCommandSvl() {
@@ -107,6 +109,7 @@ namespace Simulator.Sensors
     public class LGSVLRaptorSensor : SensorBase
     {
         private VehicleVPP VPP;
+        private VehicleSMI NonVPP_alt = null;
         private BridgeInstance Bridge;
 
         private VehicleCommandSvl Command;
@@ -121,6 +124,10 @@ namespace Simulator.Sensors
             if (VPP == null)
             {
                 Debug.LogWarning("Could not find VehicleVPP.");
+                NonVPP_alt = GetComponentInParent<VehicleSMI>();
+                if (NonVPP_alt == null){
+                    Debug.LogWarning("Could not find supported vehicle dynamics model (VPP/VehicleSMI).");
+                }
             }
         }
 
@@ -143,7 +150,9 @@ namespace Simulator.Sensors
 
         public override void OnBridgeSetup(BridgeInstance bridge)
         {
-            if (bridge?.Plugin?.GetBridgeNameAttribute()?.Type == "ROS2")
+            if (bridge?.Plugin?.GetBridgeNameAttribute()?.Type == "ROS2" ||
+                bridge?.Plugin?.GetBridgeNameAttribute()?.Type == "ROS2_Bridge_GAIA"
+            )
             {
                 Bridge = bridge;
                 Bridge.AddSubscriber<VehicleCommandSvl>(Topic, data =>
@@ -154,7 +163,12 @@ namespace Simulator.Sensors
                     Command = data;
                     if ((data.flags & 1) > 0)
                     {
-                        VPP.PurpleFlag = true;
+                        // Purple Flag
+                        if (VPP == null){
+                            NonVPP_alt.EmergencyStopped = true;
+                        } else {
+                            VPP.EmergencyStopped = true;
+                        }
                     }
                 });
                 Bridge.AddSubscriber<VehicleStatusSvl>(StatusTopic, data =>
@@ -165,12 +179,30 @@ namespace Simulator.Sensors
                     Status = data;
                     if (data.ct_state == 5)
                     {
-                        VPP.StartEngine();
+                        if (VPP == null){
+                            NonVPP_alt.StartEngine();
+                        } else {
+                            VPP.StartEngine();
+                        }
+                    }
+
+                    if (data.ct_state == 11)
+                    {
+                        if (VPP == null){
+                            NonVPP_alt.StopEngine();
+                        } else {
+                            VPP.StopEngine();
+                        }
                     }
 
                     if (data.ct_state == 12)
                     {
-                        VPP.PurpleFlag = true;
+                        // Purple Flag
+                        if (VPP == null){
+                            NonVPP_alt.EmergencyStopped = true;
+                        } else {
+                            VPP.EmergencyStopped = true;
+                        }
                     }
                 });
             }
