@@ -17,57 +17,21 @@ using VehiclePhysics;
 
 namespace Simulator.Sensors
 {
-    [MessageType("iac_msgs/RaceControlHeader")]
-    public struct RaceControlHeader
+    [MessageType("iac_msgs/RaptorMockupCommand")]
+    public struct RaptorMockupCommand
     {
         public Simulator.Bridge.Data.Ros.Time stamp;
         public byte vehicle_number;
-        public byte sequence_number;
-    }
-
-    [MessageType("iac_msgs/VehicleCommand")]
-    public struct VehicleCommand
-    {
-        public RaceControlHeader header;
-        public byte flags;
-        public byte position_command;
-        public byte track_position;
-        public byte laps;
-        public ushort laps_fraction;
-    }
-
-    [MessageType("iac_msgs/VehicleStatus")]
-    public struct VehicleStatus {
-        public RaceControlHeader header;
-        public byte flags_received;
-        public byte flags_met;
-        public byte position_command_progress;
-        public byte location;
-        public byte ct_state;
-        public byte sys_state;
+        //public byte sequence_number;
+        public bool engine_ignition_command;
+        public bool emergency_stop_command;
     }
 
     public struct VehicleCommandSvl
     {
         public byte vehicle_number;
-        public byte sequence_number;
-        public byte flags;
-        public byte position_command;
-        public byte track_position;
-        public byte laps;
-        public ushort laps_fraction;
-    }
-
-    public struct VehicleStatusSvl
-    {
-        public byte vehicle_number;
-        public byte sequence_number;
-        public byte flags_received;
-        public byte flags_met;
-        public byte position_command_progress;
-        public byte location;
-        public byte ct_state;
-        public byte sys_state;
+        public bool engine_ignition_command;
+        public bool emergency_stop_command;
     }
 
     public class RaptorDataBridgePlugin : ISensorBridgePlugin
@@ -79,33 +43,17 @@ namespace Simulator.Sensors
             )
             {
                 plugin.Factory.RegSubscriber(plugin,
-                    (VehicleCommand data) => new VehicleCommandSvl() {
-                        vehicle_number = data.header.vehicle_number,
-                        sequence_number = data.header.sequence_number,
-                        flags = data.flags,
-                        position_command = data.position_command,
-                        track_position = data.track_position,
-                        laps = data.laps,
-                        laps_fraction = data.laps_fraction,
-                    }
-                );
-                plugin.Factory.RegSubscriber(plugin,
-                    (VehicleStatus data) => new VehicleStatusSvl() {
-                        vehicle_number = data.header.vehicle_number,
-                        sequence_number = data.header.sequence_number,
-                        flags_received = data.flags_received,
-                        flags_met = data.flags_met,
-                        position_command_progress = data.position_command_progress,
-                        location = data.location,
-                        ct_state = data.ct_state,
-                        sys_state = data.sys_state,
+                    (RaptorMockupCommand data) => new VehicleCommandSvl() {
+                        vehicle_number = data.vehicle_number,
+                        engine_ignition_command = data.engine_ignition_command,
+                        emergency_stop_command = data.emergency_stop_command,
                     }
                 );
             }
         }
     }
 
-    [SensorType("LGSVL Raptor Sensor", new[] { typeof(VehicleCommand), typeof(VehicleStatus) })]
+    [SensorType("LGSVL Raptor Sensor", new[] { typeof(RaptorMockupCommand) })]
     public class LGSVLRaptorSensor : SensorBase
     {
         private VehicleVPP VPP;
@@ -113,10 +61,6 @@ namespace Simulator.Sensors
         private BridgeInstance Bridge;
 
         private VehicleCommandSvl Command;
-        private VehicleStatusSvl Status;
-
-        [SensorParameter]
-        public string StatusTopic;
 
         private void Awake()
         {
@@ -161,7 +105,7 @@ namespace Simulator.Sensors
                         return;
 
                     Command = data;
-                    if ((data.flags & 1) > 0)
+                    if (data.emergency_stop_command)
                     {
                         // Purple Flag
                         if (VPP == null){
@@ -170,38 +114,19 @@ namespace Simulator.Sensors
                             VPP.EmergencyStopped = true;
                         }
                     }
-                });
-                Bridge.AddSubscriber<VehicleStatusSvl>(StatusTopic, data =>
-                {
-                    if (Time.timeScale == 0f)
-                        return;
 
-                    Status = data;
-                    if (data.ct_state == 5)
+                    if (data.engine_ignition_command)
                     {
                         if (VPP == null){
                             NonVPP_alt.StartEngine();
                         } else {
                             VPP.StartEngine();
                         }
-                    }
-
-                    if (data.ct_state == 11)
-                    {
+                    } else {
                         if (VPP == null){
                             NonVPP_alt.StopEngine();
                         } else {
                             VPP.StopEngine();
-                        }
-                    }
-
-                    if (data.ct_state == 12)
-                    {
-                        // Purple Flag
-                        if (VPP == null){
-                            NonVPP_alt.EmergencyStopped = true;
-                        } else {
-                            VPP.EmergencyStopped = true;
                         }
                     }
                 });
@@ -214,20 +139,9 @@ namespace Simulator.Sensors
 
             var graphData = new Dictionary<string, object>();
 
-            graphData["flags"] = Command.flags;
-            graphData["position_command"] = Command.position_command;
-            graphData["track_position"] = Command.track_position;
-            graphData["laps"] = Command.laps;
-            graphData["laps_fraction"] = Command.laps_fraction;
-
-            graphData["vehicle_number"] = Status.vehicle_number;
-            graphData["sequence_number"] = Status.sequence_number;
-            graphData["flags_received"] = Status.flags_received;
-            graphData["flags_met"] = Status.flags_met;
-            graphData["position_command_progress"] = Status.position_command_progress;
-            graphData["location"] = Status.location;
-            graphData["ct_state"] = Status.ct_state;
-            graphData["sys_state"] = Status.sys_state;
+            graphData["vehicle_number"] = Command.vehicle_number;
+            graphData["engine_ignition_command"] = Command.engine_ignition_command;
+            graphData["emergency_stop_command"] = Command.emergency_stop_command;
 
             visualizer.UpdateGraphValues(graphData);
         }
